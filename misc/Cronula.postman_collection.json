@@ -1,0 +1,133 @@
+{
+	"info": {
+		"_postman_id": "c1f2bda6-48bc-4dc9-8f14-18cb133603eb",
+		"name": "Cronula",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "CREATE",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"cron\": \"* * * ? * *\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/cron",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"cron"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "UPDATE",
+			"request": {
+				"method": "PUT",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"cron\": \"0 0 11 * * ?\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/cron/028b2f85-9f39-4aa2-ac6c-2e4dbfced771",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"cron",
+						"028b2f85-9f39-4aa2-ac6c-2e4dbfced771"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "GET (one)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/cron/028b2f85-9f39-4aa2-ac6c-2e4dbfced771n",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"cron",
+						"028b2f85-9f39-4aa2-ac6c-2e4dbfced771n"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "GET (all)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/cron",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"cron"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "DELETE",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/cron/9095bd9e-0b24-4feb-afac-2f998296e113",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"cron",
+						"9095bd9e-0b24-4feb-afac-2f998296e113"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"id": "8adf5583-2d20-4c0e-82f0-18970946a6c2",
+			"key": "ID",
+			"value": "7171552e-c6ba-4851-85a5-d0c46a642d1e"
+		}
+	],
+	"protocolProfileBehavior": {}
+}

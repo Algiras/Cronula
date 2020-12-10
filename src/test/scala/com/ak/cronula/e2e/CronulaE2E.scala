@@ -74,8 +74,9 @@ class CronulaE2E extends Specification {
     "schedule job should be recorded in actionLog" >> new Context {
       runtime.unsafeRun(service.use(env => for {
         id1 <- env.client.create(cronExpr)
+        _ <- TestUtils.retry(env.client.get(id1))(_.isDefined)
         id2 <- env.client.create(cronExpr)
-        _ <- TestUtils.retry(env.client.getAll)(res => Set(id1, id2).subsetOf(res.map(_.id).toSet))
+        _ <- TestUtils.retry(env.client.get(id2))(_.isDefined)
         actions <- env.actionLog.records.take(5).run(ZSink.collectAll[Action]).map(_.toList)
       } yield actions.map(_.issuerId) must contain(id1, id2)
       ))
@@ -85,7 +86,7 @@ class CronulaE2E extends Specification {
   trait Context extends Scope {
     val tenantId: UUID = UUID.randomUUID()
 
-    val cronExpr: CronExpr = cron4s.Cron.parse("* * * ? * *").fold(throw _, identity)
+    val cronExpr: CronExpr = cron4s.Cron.parse("*/2 * * ? * *").fold(throw _, identity)
     val cronExpr2: CronExpr = cron4s.Cron.parse("10-34 2,4,6 * ? * *").fold(throw _, identity)
 
     val runtime = Runtime(zio.Runtime.default.environment ++ GreyhoundMetrics.live, Platform.default)
@@ -121,6 +122,7 @@ object CronulaE2E {
   case class TestEnv(client: CronClient, actionLog: Topic[ActionRequest, Action])
 
   case class CronClient(httpClient: Client[AppTask], uri: Uri) {
+    implicit val uuidEntityDecoder: EntityDecoder[AppTask, UUID] = jsonOf[AppTask, UUID]
     implicit val cronEntityDecoder: EntityDecoder[AppTask, CronJob] = jsonOf[AppTask, CronJob]
     implicit val cronEntitySeqDecoder: EntityDecoder[AppTask, Seq[CronJob]] = jsonOf[AppTask, Seq[CronJob]]
     implicit val cronRequestEncoder: EntityEncoder[AppTask, CronRequest] = jsonEncoderOf[AppTask, CronRequest]
@@ -129,10 +131,10 @@ object CronulaE2E {
       Request[AppTask](method = Method.GET, uri = uri.withPath(s"cron/$id"))
     )
 
-    def create(cronExpr: CronExpr): AppTask[UUID] = httpClient.expect[String](
+    def create(cronExpr: CronExpr): AppTask[UUID] = httpClient.expect[UUID](
       Request[AppTask](method = Method.POST, uri = uri.withPath(s"cron"))
         .withEntity(CronRequest(cronExpr.toString))
-    ).map(UUID.fromString)
+    )
 
     def update(id: UUID, cronExpr: CronExpr): AppTask[Unit] = httpClient.expect[Unit](
       Request[AppTask](method = Method.PUT, uri = uri.withPath(s"cron/$id"))

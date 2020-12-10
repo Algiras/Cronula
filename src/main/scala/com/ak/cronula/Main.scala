@@ -26,18 +26,14 @@ object Main extends App {
     val finalHttpApp = Logger.httpApp(logHeaders = true, logBody = true)(httpApp)
 
     for {
-      cronStream <- cronService.stream.flatMap(
+      _ <- cronService.stream.flatMap(
         job => ZStream.fromEffect(actionLogTopic.record(ActionRequest(job.id)))
       ).runDrain.fork.toManaged_
-      actionLogStream <- actionLogTopic.records.flatMap(action => {
-        ZStream.fromEffect(zio.console.putStrLn(s"id: ${action.id}, issuer: ${action.issuerId}"))
-      }).runDrain.fork.toManaged_
       server <- BlazeServerBuilder[AppTask](ExecutionContext.global)
         .bindHttp(config.server.port, config.server.host)
         .withHttpApp(finalHttpApp)
         .resource
         .toManaged
-      _ <- ZIO.unit.toManaged(_ => ZIO.collectAllPar(Seq(cronStream.interruptFork, actionLogStream.interruptFork)))
     } yield server
   }
 

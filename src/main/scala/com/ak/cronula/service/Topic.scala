@@ -30,7 +30,7 @@ object Topic {
 
     for {
       queue <- Queue.unbounded[V].toManaged(_.shutdown)
-      tenantId <- kafkaConfig.tenantId.map(ZIO(_)).getOrElse(ZIO(UUID.randomUUID())).toManaged_
+      tenantId <- kafkaConfig.tenantId.map(ZIO.effect(_)).getOrElse(ZIO(UUID.randomUUID())).toManaged_
       producer <- Producer.make(ProducerConfig(kafkaConfigStr))
       _ <- RecordConsumer.make(
         core.consumer.RecordConsumerConfig(
@@ -60,7 +60,7 @@ object Topic {
           valueSerializer = valueSerde)
       } yield recordId
 
-      override def records: ZStream[Any, Nothing, V] = ZStream.fromQueue(queue)
+      override def records: ZStream[Any, Nothing, V] = ZStream.fromQueueWithShutdown(queue)
     }
   }
 }

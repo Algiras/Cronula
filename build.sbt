@@ -26,20 +26,19 @@ lazy val root = (project in file("."))
       "dev.zio" %% "zio-config-typesafe" % zioConfigVersion,
       "dev.zio" %% "zio-interop-cats" % zioInteropCatsVersion,
 
+      "dev.zio" %% "zio-streams" % zioVersion,
+
       "com.github.alonsodomin.cron4s" %% "cron4s-core" % cron4sVersion,
       "com.github.alonsodomin.cron4s" %% "cron4s-circe" % cron4sVersion,
-
-      "dev.zio" %% "zio-streams" % zioVersion,
 
       "org.http4s" %% "http4s-blaze-server" % Http4sVersion,
       "org.http4s" %% "http4s-blaze-client" % Http4sVersion,
       "org.http4s" %% "http4s-circe" % Http4sVersion,
       "org.http4s" %% "http4s-dsl" % Http4sVersion,
-      "io.circe" %% "circe-generic" % CirceVersion,
+
       "org.specs2" %% "specs2-core" % Specs2Version % Test,
       "com.wix" %% "specs2-jmock" % "1.5.1" % Test,
       "org.jmock" % "jmock-junit4" % "2.12.0" % Test,
-      "io.circe" % "circe-optics_2.12" % "0.13.0" % Test,
       "ch.qos.logback" % "logback-classic" % LogbackVersion,
 
       "com.wix" %% "greyhound-core" % greyhoundVersion,
@@ -47,6 +46,7 @@ lazy val root = (project in file("."))
       "io.circe" %% "circe-parser" % CirceVersion,
       "io.circe" %% "circe-generic-extras" % circeExtrasVersion,
       "io.circe" %% "circe-shapes" % circeExtrasVersion,
+      "io.circe" %% "circe-generic" % CirceVersion,
     ),
     addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3"),
     addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
