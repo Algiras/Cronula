@@ -2,7 +2,6 @@ package com.ak.cronula.model
 
 import java.util.UUID
 
-import com.ak.cronula.model.Cron.CronJob
 import com.ak.cronula.model.CronulaSate.CronulaSateEvents.{Clean, CronulaEvent, DeleteJob, RecordJob, Updatejob}
 import org.specs2.mutable.Specification
 import org.specs2.specification.Scope

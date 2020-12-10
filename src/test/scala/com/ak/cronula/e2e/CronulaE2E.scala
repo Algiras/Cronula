@@ -8,9 +8,9 @@ import cats.implicits._
 import com.ak.cronula.CronulaRoutes.CronRequest
 import com.ak.cronula.config._
 import com.ak.cronula.e2e.CronulaE2E.{AppTask, TestEnv}
-import com.ak.cronula.model.Action
-import com.ak.cronula.model.Cron.CronJob
-import com.ak.cronula.service.{ActionLog, KafkaCron}
+import com.ak.cronula.model.{Action, CronJob}
+import com.ak.cronula.service.ActionLog.ActionRequest
+import com.ak.cronula.service.{ActionLog, KafkaCron, Topic}
 import com.ak.cronula.{Main, TestUtils}
 import com.wixpress.dst.greyhound.core.metrics
 import com.wixpress.dst.greyhound.core.metrics.GreyhoundMetrics
@@ -94,7 +94,8 @@ class CronulaE2E extends Specification {
       for {
         config <- zio.config.config[ApplicationConfig].toManaged_
         kafkaConf = config.kafka.copy(tenantId = Some(tenantId))
-        kafka <- KafkaCron.make(kafkaConf)
+        kafkaCronTopic <- KafkaCron.kafkaTopic(kafkaConf)
+        kafka <- KafkaCron.make(kafkaCronTopic)
         actionLog <- ActionLog.make(kafkaConf)
         app <- Main.server(config, kafka, actionLog)
       } yield {
@@ -117,7 +118,7 @@ class CronulaE2E extends Specification {
 object CronulaE2E {
   type AppTask[A] = RIO[ZEnv, A]
 
-  case class TestEnv(client: CronClient, actionLog: ActionLog)
+  case class TestEnv(client: CronClient, actionLog: Topic[ActionRequest, Action])
 
   case class CronClient(httpClient: Client[AppTask], uri: Uri) {
     implicit val cronEntityDecoder: EntityDecoder[AppTask, CronJob] = jsonOf[AppTask, CronJob]

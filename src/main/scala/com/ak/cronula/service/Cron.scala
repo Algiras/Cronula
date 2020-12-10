@@ -2,8 +2,8 @@ package com.ak.cronula.service
 
 import java.util.UUID
 
-import com.ak.cronula.model.Cron.CronJob
 import CronErrors._
+import com.ak.cronula.model.CronJob
 
 trait Cron[F[_]] {
   def getAll: F[Set[CronJob]]

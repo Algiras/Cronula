@@ -6,16 +6,13 @@ import java.util.UUID
 import cats.syntax.either._
 import com.ak.cronula.Main.AppTask
 import com.ak.cronula.config.KafkaConfig
-import com.ak.cronula.model.Cron.CronJob
-import com.ak.cronula.model.CronulaSate
+import com.ak.cronula.model.{CronJob, CronulaSate}
 import com.ak.cronula.model.CronulaSate.CronulaSateEvents
 import com.ak.cronula.model.CronulaSate.CronulaSateEvents.CronulaEvent
 import com.ak.cronula.service.CronErrors._
 import com.wixpress.dst.greyhound.core.consumer.RecordConsumer.Env
-import com.wixpress.dst.greyhound.core.consumer.domain.{ConsumerRecord, ConsumerSubscription, RecordHandler}
-import com.wixpress.dst.greyhound.core.consumer.{OffsetReset, RecordConsumer, RecordConsumerConfig}
-import com.wixpress.dst.greyhound.core.producer.{Producer, ProducerConfig, ProducerRecord}
-import com.wixpress.dst.greyhound.core.{Serde, Serdes, consumer}
+import com.wixpress.dst.greyhound.core.metrics.GreyhoundMetrics
+import com.wixpress.dst.greyhound.core.{Serde, Serdes}
 import cron4s.lib.javatime._
 import io.circe.parser.decode
 import io.circe.syntax._
@@ -33,7 +30,6 @@ trait KafkaCron extends Cron[AppTask]{
   def update(id: UUID, cronString: String): AppTask[Either[CronException, Unit]]
   def delete(id: UUID): AppTask[Unit]
 
-  def clear: AppTask[Unit]
   def stream: ZStream[Clock, Throwable, CronJob]
 }
 
@@ -42,45 +38,21 @@ object KafkaCron {
     decode[CronulaEvent](_).getOrElse(throw new RuntimeException("Failed parsing Cronula Event"))
   )(_.asJson.noSpaces)
 
-  def make(kafkaConfig: KafkaConfig): ZManaged[Blocking with Env, Throwable, KafkaCron] = for {
+  def kafkaTopic(kafkaConfig: KafkaConfig): ZManaged[zio.ZEnv with GreyhoundMetrics, Throwable, Topic[CronulaEvent, CronulaEvent]] =
+    Topic.makeKafkaTopic[CronulaEvent, CronulaEvent](kafkaConfig, _.cron, CronEventSerde, (_, event) => event)
+
+  def make(topic: Topic[CronulaEvent, CronulaEvent]): ZManaged[Blocking with Env, Throwable, KafkaCron] = for {
     state <- Ref.make(CronulaSate.empty).toManaged_
-    kafkaConfigStr = s"${kafkaConfig.host}:${kafkaConfig.port}"
-    tenantId <- kafkaConfig.tenantId.map(ZIO(_)).getOrElse(ZIO(UUID.randomUUID())).toManaged_
-    topic = kafkaConfig.topics.cron
-    group = kafkaConfig.group.getOrElse(RecordConsumerConfig.makeClientId)
-    producer <- Producer.make(ProducerConfig(kafkaConfigStr))
-    _ <- RecordConsumer.make(
-      consumer.RecordConsumerConfig(
-        kafkaConfigStr,
-        group,
-        ConsumerSubscription.Topics(Set(topic)),
-        offsetReset = OffsetReset.Earliest
-      ),
-      RecordHandler {
-        record: ConsumerRecord[Key, CronulaEvent] =>
-          record.key match {
-            case Some(value) if value.tenantId == tenantId => state.update(CronulaSate.process(record.value, _))
-            case _ => ZIO.unit
-          }
-      }.withDeserializers(Key.KeySerde, CronEventSerde)
-    ).useForever.fork.toManaged_
+    _ <- topic.records.flatMap(
+      event => ZStream.fromEffect(state.update(CronulaSate.process(event, _)))
+    ).runDrain.fork.toManaged(_.interruptFork)
   } yield new KafkaCron {
     override def getAll: ZIO[Any, Nothing, Set[CronJob]] = state.get.map(state => state.jobs.values.toSet)
 
     override def get(id: UUID): ZIO[Any, Nothing, Either[NotFoundException.type, CronJob]] = state.get
       .map(state => state.jobs.get(id).map(Right(_)).getOrElse(Left(NotFoundException)))
 
-    private def recordEvent(cronulEvent: CronulaSateEvents.CronulaEvent) = for {
-      recordId <- ZIO(UUID.randomUUID())
-      _ <- producer.produce[Key, CronulaSateEvents.CronulaEvent](
-        record = ProducerRecord(
-          topic = topic,
-          value = cronulEvent,
-          key = Some(Key(tenantId, recordId)),
-        ),
-        keySerializer = Key.KeySerde,
-        valueSerializer = CronEventSerde)
-    } yield ()
+    private def recordEvent(cronulEvent: CronulaSateEvents.CronulaEvent) = topic.record(cronulEvent)
 
     override def create(cronString: String): ZIO[Blocking, Throwable, Either[ParseException.type, UUID]] = for {
       encodedCronStrEither <- ZIO(cron4s.Cron.parse(cronString).leftMap(_ => ParseException))
@@ -93,9 +65,7 @@ object KafkaCron {
       _ <- encodedCronStrEither.fold(_ => ZIO.unit, encodedCronStr => recordEvent(CronulaSateEvents.Updatejob(id, encodedCronStr)))
     } yield encodedCronStrEither.map(_ => ())
 
-    override def delete(id: UUID): AppTask[Unit] = recordEvent(CronulaSateEvents.DeleteJob(id))
-
-    def clear: AppTask[Unit] = recordEvent(CronulaSateEvents.Clean)
+    override def delete(id: UUID): ZIO[Blocking, Throwable, Unit] = recordEvent(CronulaSateEvents.DeleteJob(id)).unit
 
     def stream: ZStream[Clock, Throwable, CronJob] = for {
       from <- ZStream.repeatEffect(ZIO.sleep(duration.Duration.fromScala(1.second)).flatMap(_ => zio.clock.currentDateTime))

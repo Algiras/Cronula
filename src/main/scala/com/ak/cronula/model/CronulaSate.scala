@@ -1,7 +1,6 @@
 package com.ak.cronula.model
 
 import java.util.UUID
-import com.ak.cronula.model.Cron.CronJob
 import cron4s.CronExpr
 import io.circe.{Decoder, Encoder}
 import cron4s.circe._

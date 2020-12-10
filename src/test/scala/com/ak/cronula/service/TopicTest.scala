@@ -14,19 +14,21 @@ import zio.config.typesafe.TypesafeConfig
 import zio.internal.Platform
 import zio.stream.ZSink
 
-class ActionLogTest extends Specification {
-  "ActionLog" should {
-    "record actions" in new Context {
-      runtime.unsafeRun(service.use(actionlog => for {
-        resId <- actionlog.record(ActionRequest(issuerId))
-        resId2 <- actionlog.record(ActionRequest(issuerId))
-        resId3 <- actionlog.record(ActionRequest(issuerId2))
-        result <- actionlog.records.take(3).run(ZSink.collectAll[Action]).map(_.toList)
-      } yield result must contain(
-        Action(resId, issuerId),
-        Action(resId2, issuerId),
-        Action(resId3, issuerId2)
-      )))
+class TopicTest extends Specification {
+  "TopicTest" in {
+    "Action Log" should {
+      "record actions" in new Context {
+        runtime.unsafeRun(service.use(actionlog => for {
+          resId <- actionlog.record(ActionRequest(issuerId))
+          resId2 <- actionlog.record(ActionRequest(issuerId))
+          resId3 <- actionlog.record(ActionRequest(issuerId2))
+          result <- actionlog.records.take(3).run(ZSink.collectAll[Action]).map(_.toList)
+        } yield result must contain(
+          Action(resId, issuerId),
+          Action(resId2, issuerId),
+          Action(resId3, issuerId2)
+        )))
+      }
     }
   }
 
@@ -44,5 +46,4 @@ class ActionLogTest extends Specification {
       TypesafeConfig.fromDefaultLoader(ApplicationConfig.applicationConfig) ++ metrics.GreyhoundMetrics.liveLayer
     )
   }
-
 }

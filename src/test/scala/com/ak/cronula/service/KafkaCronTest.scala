@@ -4,7 +4,7 @@ import java.util.UUID
 
 import com.ak.cronula.TestUtils
 import com.ak.cronula.config.ApplicationConfig
-import com.ak.cronula.model.Cron.CronJob
+import com.ak.cronula.model.CronJob
 import com.ak.cronula.service.CronErrors.NotFoundException
 import com.wixpress.dst.greyhound.core.metrics
 import com.wixpress.dst.greyhound.core.metrics.GreyhoundMetrics
@@ -64,7 +64,7 @@ class KafkaCronTest extends Specification {
     "stream messages using crons" in new Context {
       runtime.unsafeRun(
         service.use(service => for {
-          _ <- TestUtils.retry(service.clear.flatMap(_ => service.getAll))(_.isEmpty)
+
           id <- service.create(cronExpr.toString).flatMap(ZIO.fromEither(_))
           _ <- TestUtils.retry(service.get(id))(_.isRight)
           finalState <- service.stream.take(3).run(ZSink.collectAll[CronJob]).map(_.toSeq)
@@ -81,10 +81,10 @@ class KafkaCronTest extends Specification {
 
     val runtime = Runtime(zio.Runtime.default.environment ++ GreyhoundMetrics.live, Platform.default)
 
-    val service = (for {
+    val service: ZManaged[zio.ZEnv, Throwable, KafkaCron] = (for {
       appConfig <- zio.config.config[ApplicationConfig].toManaged_
-      service <- KafkaCron.make(appConfig.kafka.copy(tenantId = Some(tenantId)))
-      _ <- service.clear.toManaged_
+      kafkaTopic <- KafkaCron.kafkaTopic(appConfig.kafka.copy(tenantId = Some(tenantId)))
+      service <- KafkaCron.make(kafkaTopic)
     } yield service).provideCustomLayer(
         TypesafeConfig.fromDefaultLoader(ApplicationConfig.applicationConfig) ++ metrics.GreyhoundMetrics.liveLayer
       )
