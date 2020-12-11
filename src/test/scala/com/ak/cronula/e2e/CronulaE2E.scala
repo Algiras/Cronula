@@ -98,7 +98,7 @@ class CronulaE2E extends Specification {
         kafkaConf = config.kafka.copy(tenantId = Some(tenantId))
         kafkaCronTopic <- KafkaCron.kafkaTopic(kafkaConf)
         kafka <- KafkaCron.make(kafkaCronTopic)
-        actionLog <- ActionLog.make(kafkaConf)
+        actionLog <- ActionLog.kafkaTopic(kafkaConf)
         app <- Main.server(config, kafka, actionLog)
       } yield {
         val httpClient: Client[AppTask] = {

@@ -3,7 +3,7 @@ package com.ak.cronula.service
 import java.util.UUID
 
 import com.ak.cronula.config.{KafkaConfig, Topics}
-import com.ak.cronula.service.Key.KeySerde
+import com.ak.cronula.service.Key.keySerde
 import com.wixpress.dst.greyhound.core
 import com.wixpress.dst.greyhound.core.Serde
 import com.wixpress.dst.greyhound.core.consumer.domain.{ConsumerRecord, ConsumerSubscription}
@@ -15,7 +15,7 @@ import zio.blocking.Blocking
 import zio.stream.ZStream
 
 trait Topic[VReq, V] {
-  def record(action: VReq): RIO[Blocking, UUID]
+  def record(request: VReq): RIO[Blocking, UUID]
   def records: ZManaged[RecordConsumer.Env, Throwable, ZStream[Any, Nothing, V]]
 }
 
@@ -39,7 +39,7 @@ object Topic {
             value = fromRequest(recordId, actionRequest),
             key = Some(Key(tenantId, recordId)),
           ),
-          keySerializer = KeySerde,
+          keySerializer = keySerde,
           valueSerializer = valueSerde)
       } yield recordId
 
@@ -58,7 +58,7 @@ object Topic {
                 case Some(key) if key.tenantId == tenantId => queue.offer(record.value)
                 case _ => ZIO.unit
               }
-          }.withDeserializers(KeySerde, valueSerde)
+          }.withDeserializers(keySerde, valueSerde)
         )
       } yield ZStream.fromQueue(queue)
     }

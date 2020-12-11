@@ -19,7 +19,6 @@ object CronulaSate {
    case class RecordJob(id: UUID, cronString: CronExpr) extends CronulaEvent
    case class DeleteJob(id: UUID) extends CronulaEvent
    case class Updatejob(id: UUID, cronString: CronExpr) extends CronulaEvent
-   case object Clean extends CronulaEvent
 
    implicit val cronulaEventEncoder: Encoder[CronulaEvent] = deriveEncoder[CronulaEvent]
    implicit val cronulaEventDecoder: Decoder[CronulaEvent] = deriveDecoder[CronulaEvent]
@@ -30,6 +29,5 @@ object CronulaSate {
     case CronulaSateEvents.DeleteJob(id) => state.copy(jobs = state.jobs - id)
     case CronulaSateEvents.Updatejob(id, cronString) => state.copy(
       jobs = state.jobs.get(id).map(_ => state.jobs + (id -> CronJob(id, cronString))).getOrElse(state.jobs))
-    case CronulaSateEvents.Clean => CronulaSate()
   }
 }

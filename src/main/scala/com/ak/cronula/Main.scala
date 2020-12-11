@@ -49,7 +49,7 @@ object Main extends App {
           appConfig <- zio.config.config[ApplicationConfig].toManaged_
           cronKafkaTopic <- service.KafkaCron.kafkaTopic(appConfig.kafka)
           cronService <- service.KafkaCron.make(cronKafkaTopic)
-          actionLogTopic <- service.ActionLog.make(appConfig.kafka)
+          actionLogTopic <- service.ActionLog.kafkaTopic(appConfig.kafka)
           _ <- server(appConfig, cronService, actionLogTopic)(runtime)
           _ <- zio.console.getStrLn.toManaged_
         } yield ExitCode.success).use(ZIO(_))

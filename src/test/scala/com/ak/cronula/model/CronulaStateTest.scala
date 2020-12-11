@@ -2,7 +2,7 @@ package com.ak.cronula.model
 
 import java.util.UUID
 
-import com.ak.cronula.model.CronulaSate.CronulaSateEvents.{Clean, CronulaEvent, DeleteJob, RecordJob, Updatejob}
+import com.ak.cronula.model.CronulaSate.CronulaSateEvents.{CronulaEvent, DeleteJob, RecordJob, Updatejob}
 import org.specs2.mutable.Specification
 import org.specs2.specification.Scope
 
@@ -46,22 +46,6 @@ class CronulaStateTest extends Specification {
         processState(
           Updatejob(id, cronExpr),
         ).jobs.get(id) must beNone
-      }
-
-      "clean event deletes all records" in new Context {
-        val initialState = processState(
-          RecordJob(id, cronExpr),
-          RecordJob(id2, cronExpr2),
-        )
-
-        initialState.jobs.values must contain(
-          CronJob(id, cronExpr),
-          CronJob(id2, cronExpr2)
-        )
-
-        processWithState(initialState)(
-          Clean
-        ).jobs must beEmpty
       }
     }
 

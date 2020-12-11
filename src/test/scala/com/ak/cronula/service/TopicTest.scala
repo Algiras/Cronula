@@ -44,7 +44,7 @@ class TopicTest extends Specification {
 
     val service = (for {
       appConfig <- zio.config.config[ApplicationConfig].toManaged_
-      service <- ActionLog.make(appConfig.kafka.copy(tenantId = Some(tenantId)))
+      service <- ActionLog.kafkaTopic(appConfig.kafka.copy(tenantId = Some(tenantId)))
     } yield service).provideCustomLayer(
       TypesafeConfig.fromDefaultLoader(ApplicationConfig.applicationConfig) ++ metrics.GreyhoundMetrics.liveLayer
     )

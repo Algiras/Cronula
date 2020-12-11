@@ -6,16 +6,13 @@ import java.util.UUID
 import cats.syntax.either._
 import com.ak.cronula.Main.AppTask
 import com.ak.cronula.config.KafkaConfig
-import com.ak.cronula.model.{CronJob, CronulaSate}
 import com.ak.cronula.model.CronulaSate.CronulaSateEvents
 import com.ak.cronula.model.CronulaSate.CronulaSateEvents.CronulaEvent
+import com.ak.cronula.model.{CronJob, CronulaSate}
 import com.ak.cronula.service.CronErrors._
+import com.wixpress.dst.greyhound.core.Serde
 import com.wixpress.dst.greyhound.core.consumer.RecordConsumer.Env
-import com.wixpress.dst.greyhound.core.metrics.GreyhoundMetrics
-import com.wixpress.dst.greyhound.core.{Serde, Serdes}
 import cron4s.lib.javatime._
-import io.circe.parser.decode
-import io.circe.syntax._
 import zio._
 import zio.blocking.Blocking
 import zio.clock.Clock
@@ -34,12 +31,10 @@ trait KafkaCron extends Cron[AppTask]{
 }
 
 object KafkaCron {
-  val CronEventSerde: Serde[CronulaEvent] = Serdes.StringSerde.inmap(
-    decode[CronulaEvent](_).getOrElse(throw new RuntimeException("Failed parsing Cronula Event"))
-  )(_.asJson.noSpaces)
+  val cronEventSerde: Serde[CronulaEvent] = circeSerde[CronulaEvent]
 
-  def kafkaTopic(kafkaConfig: KafkaConfig): ZManaged[zio.ZEnv with GreyhoundMetrics, Throwable, Topic[CronulaEvent, CronulaEvent]] =
-    Topic.makeKafkaTopic[CronulaEvent, CronulaEvent](kafkaConfig, _.cron, CronEventSerde, (_, event) => event)
+  def kafkaTopic(kafkaConfig: KafkaConfig) =
+    Topic.makeKafkaTopic[CronulaEvent, CronulaEvent](kafkaConfig, _.cron, cronEventSerde, (_, event) => event)
 
   def make(topic: Topic[CronulaEvent, CronulaEvent]): ZManaged[Blocking with Env, Throwable, KafkaCron] = for {
     state <- Ref.make(CronulaSate.empty).toManaged_
@@ -72,7 +67,7 @@ object KafkaCron {
       from <- ZStream.repeatEffect(ZIO.sleep(duration.Duration.fromScala(1.second)).flatMap(_ => zio.clock.currentDateTime))
       state <- ZStream.fromEffect(state.get)
       res <- ZStream.fromEffect(ZIO.collectAll(state.jobs.toList.map(job => job._2.cronString.next(from) match {
-        case Some(next) if from.until(next, ChronoUnit.SECONDS).seconds <= 1.second => ZIO(Some(job._2))
+        case Some(next) if from.until(next, ChronoUnit.SECONDS).seconds < 1.second => ZIO(Some(job._2))
         case Some(_) => ZIO(None)
         case None => ZIO.fail(new RuntimeException("No more time...???"))
       }))).map(_.flatten)

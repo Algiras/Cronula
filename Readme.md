@@ -8,3 +8,5 @@ Kafka setup via docker: [docker-compose.yml](devEnv/kafka-docker/docker-compose.
 
 Postman config for trying out: [postman-schema](misc/Cronula.postman_collection.json)
 
+For running the build you will first need to run `docker-compose` in `devEnv/kafka-docker` directory
+and set `FP_HOST` and `FP_PORT` to specify on what port to run this service
