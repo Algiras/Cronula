@@ -72,21 +72,22 @@ class CronulaE2E extends Specification {
     }
 
     "schedule job should be recorded in actionLog" >> new Context {
-      runtime.unsafeRun(service.use(env => for {
-        id1 <- env.client.create(cronExpr)
-        _ <- TestUtils.retry(env.client.get(id1))(_.isDefined)
-        id2 <- env.client.create(cronExpr)
-        _ <- TestUtils.retry(env.client.get(id2))(_.isDefined)
-        actions <- env.actionLog.records.take(5).run(ZSink.collectAll[Action]).map(_.toList)
+      runtime.unsafeRun(service.flatMap(env => for {
+        id1 <- env.client.create(cronExpr).toManaged_
+        _ <- TestUtils.retry(env.client.get(id1))(_.isDefined).toManaged_
+        id2 <- env.client.create(cronExpr).toManaged_
+        _ <- TestUtils.retry(env.client.get(id2))(_.isDefined).toManaged_
+        stream <- env.actionLog.records
+        actions <- stream.take(5).run(ZSink.collectAll[Action]).map(_.toList).toManaged_
       } yield actions.map(_.issuerId) must contain(id1, id2)
-      ))
+      ).use(ZIO(_)))
     }
   }
 
   trait Context extends Scope {
     val tenantId: UUID = UUID.randomUUID()
 
-    val cronExpr: CronExpr = cron4s.Cron.parse("*/2 * * ? * *").fold(throw _, identity)
+    val cronExpr: CronExpr = cron4s.Cron.parse("* * * ? * *").fold(throw _, identity)
     val cronExpr2: CronExpr = cron4s.Cron.parse("10-34 2,4,6 * ? * *").fold(throw _, identity)
 
     val runtime = Runtime(zio.Runtime.default.environment ++ GreyhoundMetrics.live, Platform.default)

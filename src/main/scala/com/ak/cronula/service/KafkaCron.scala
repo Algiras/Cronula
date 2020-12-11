@@ -43,7 +43,8 @@ object KafkaCron {
 
   def make(topic: Topic[CronulaEvent, CronulaEvent]): ZManaged[Blocking with Env, Throwable, KafkaCron] = for {
     state <- Ref.make(CronulaSate.empty).toManaged_
-    _ <- topic.records.flatMap(
+    stream <- topic.records
+    _ <- stream.flatMap(
       event => ZStream.fromEffect(state.update(CronulaSate.process(event, _)))
     ).runDrain.fork.toManaged(_.interruptFork)
   } yield new KafkaCron {

@@ -2,7 +2,7 @@ package com.ak.cronula.routes
 
 import java.util.UUID
 
-import cats.effect.IO
+import cats.effect.{IO, Resource}
 import cats.implicits._
 import com.ak.cronula.CronulaRoutes.CronRequest
 import com.ak.cronula.model.{Action, CronJob}
@@ -156,7 +156,7 @@ class CronulaRoutesTest extends Specification with JMock {
     val cronString = "10-35 2,4,6 * ? * *"
 
     val cronService: Cron[IO] = mock[service.Cron[IO]]
-    val routes = CronulaRoutes.cronRoutes[IO](cronService, Stream[IO, Action](actions: _*)).orNotFound
+    val routes = CronulaRoutes.cronRoutes[IO](cronService, Resource.liftF(IO.pure(Stream[IO, Action](actions: _*)))).orNotFound
 
     def routeFromStr(route: String): Uri = Uri.fromString(route).fold(throw _, identity)
 

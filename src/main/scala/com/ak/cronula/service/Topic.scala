@@ -10,13 +10,13 @@ import com.wixpress.dst.greyhound.core.consumer.domain.{ConsumerRecord, Consumer
 import com.wixpress.dst.greyhound.core.consumer.{OffsetReset, RecordConsumer, RecordConsumerConfig, domain}
 import com.wixpress.dst.greyhound.core.metrics.GreyhoundMetrics
 import com.wixpress.dst.greyhound.core.producer.{Producer, ProducerConfig, ProducerRecord}
+import zio._
 import zio.blocking.Blocking
 import zio.stream.ZStream
-import zio._
 
 trait Topic[VReq, V] {
   def record(action: VReq): RIO[Blocking, UUID]
-  def records: ZStream[Any, Nothing, V]
+  def records: ZManaged[RecordConsumer.Env, Throwable, ZStream[Any, Nothing, V]]
 }
 
 object Topic {
@@ -26,27 +26,10 @@ object Topic {
                               fromRequest: (UUID, VReq) => V): ZManaged[ZEnv with GreyhoundMetrics, Throwable, Topic[VReq, V]] = {
     val kafkaConfigStr = s"${kafkaConfig.host}:${kafkaConfig.port}"
     val topic = getTopicName(kafkaConfig.topics)
-    val group = kafkaConfig.group.getOrElse(RecordConsumerConfig.makeClientId)
 
     for {
-      queue <- Queue.unbounded[V].toManaged(_.shutdown)
-      tenantId <- kafkaConfig.tenantId.map(ZIO.effect(_)).getOrElse(ZIO(UUID.randomUUID())).toManaged_
       producer <- Producer.make(ProducerConfig(kafkaConfigStr))
-      _ <- RecordConsumer.make(
-        core.consumer.RecordConsumerConfig(
-          kafkaConfigStr,
-          group,
-          ConsumerSubscription.Topics(Set(topic)),
-          offsetReset = OffsetReset.Earliest
-        ),
-        domain.RecordHandler {
-          record: ConsumerRecord[Key, V] =>
-            record.key match {
-              case Some(key) if key.tenantId == tenantId => queue.offer(record.value)
-              case _ => ZIO.unit
-            }
-        }.withDeserializers(KeySerde, valueSerde)
-      )
+      tenantId <- kafkaConfig.tenantId.map(ZIO.effect(_)).getOrElse(ZIO(UUID.randomUUID())).toManaged_
     } yield new Topic[VReq, V] {
       override def record(actionRequest: VReq): ZIO[Blocking, Throwable, UUID] = for {
         recordId <- ZIO(UUID.randomUUID())
@@ -60,7 +43,24 @@ object Topic {
           valueSerializer = valueSerde)
       } yield recordId
 
-      override def records: ZStream[Any, Nothing, V] = ZStream.fromQueueWithShutdown(queue)
+      override def records: ZManaged[RecordConsumer.Env, Throwable, ZStream[Any, Nothing, V]] = for {
+        queue <- Queue.unbounded[V].toManaged(_.shutdown)
+        _ <- RecordConsumer.make(
+          core.consumer.RecordConsumerConfig(
+            kafkaConfigStr,
+            kafkaConfig.group.getOrElse(RecordConsumerConfig.makeClientId),
+            ConsumerSubscription.Topics(Set(topic)),
+            offsetReset = OffsetReset.Earliest
+          ),
+          domain.RecordHandler {
+            record: ConsumerRecord[Key, V] =>
+              record.key match {
+                case Some(key) if key.tenantId == tenantId => queue.offer(record.value)
+                case _ => ZIO.unit
+              }
+          }.withDeserializers(KeySerde, valueSerde)
+        )
+      } yield ZStream.fromQueue(queue)
     }
   }
 }

@@ -2,7 +2,7 @@ package com.ak.cronula
 
 import java.util.UUID
 
-import cats.effect.Sync
+import cats.effect.{Resource, Sync}
 import cats.implicits._
 import com.ak.cronula.model.{Action, CronJob}
 import com.ak.cronula.service.CronErrors
@@ -25,7 +25,7 @@ object CronulaRoutes {
 
   implicit def cronEntityDecoder[F[_] : Sync]: EntityDecoder[F, CronRequest] = jsonOf[F, CronRequest]
 
-  def cronRoutes[F[_] : Sync](C: service.Cron[F], actionStream: Stream[F, Action]): HttpRoutes[F] = {
+  def cronRoutes[F[_] : Sync](C: service.Cron[F], actionStream: Resource[F, Stream[F, Action]]): HttpRoutes[F] = {
     val dsl = new Http4sDsl[F] {}
     import dsl._
 
@@ -58,7 +58,7 @@ object CronulaRoutes {
         result <- C.update(id, cronRequest.cron)
         resp <- parseToResponse(result)
       } yield resp
-      case GET -> Root / "tasks" => Ok(actionStream)
+      case GET -> Root / "tasks" => Ok(fs2.Stream.resource(actionStream).flatten)
     }
   }
 
